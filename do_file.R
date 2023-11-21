@@ -7,8 +7,8 @@ library(doParallel)
 library(here)
 here()
 
-jobfair_test <- read_csv("jobfair_test.csv")
-jobfair_train <- read_csv("jobfair_train.csv")
+jobfair_test <- read_csv(here("jobfair_test.csv"))
+jobfair_train <- read_csv(here("jobfair_train.csv"))
 
 
 # Train dataset -----------------------------------------------------------
@@ -49,8 +49,6 @@ jobfair_train_ad_ctmf <- model.matrix(~., jobfair_train_ad_dc %>% select(!regist
 
 
 # group-scaling -----------------------------------------------------------
-# group-scaling in order to (try to) eliminate hierarchical structure of the data. Alternative is to use hierarchical
-# modelling approach, but it would be impossible to meet the deadline if I go there and not sure if it helps much compared to this approach
 
 #numeric variables
 namesNum <- jobfair_train %>% select(where(is.numeric)) %>% names()
@@ -76,7 +74,7 @@ jobfair_train_ad_gs <- as_tibble(jobfair_train_ad_ctmf) %>%
 
 
 # modelling section -------------------------------------------------------
-# because of deadline, I used random sample of leagues so that estimation could run faster
+# because of (already missed) deadline :), I used random sample of 100 leagues (1400 teams)
 set.seed(123)
 sampling <- unique(jobfair_train$league_id)[sample(1:length(unique(jobfair_train$league_id)),size = 100)]
 
@@ -91,14 +89,15 @@ x <- as.matrix(jobfair_train_ad_gs %>% ungroup() %>%
 
 n.cores <- parallel::detectCores() - 1
 registerDoParallel(cores = n.cores)
-seqAlpha <- c(0,0.33,0.66,1)#computional time very consuming
-
+seqAlpha <- c(0,0.33,0.66,1)#computational time consuming (even with parallelization) to loop through this  
+# alpha elastic net coef - ridge <-> lasso
+ 
 set.seed(1234)
 system.time(  
   cross_valid <- foreach(i = seqAlpha, .combine = rbind, .packages="ordinalNet") %dopar% { 
 fit_cv <- ordinalNetCV(x, y, family = "cumulative", link = "logit",alpha = i,
                    parallelTerms = TRUE, nonparallelTerms = FALSE, standardize = TRUE,
-                   tuneMethod = "cvLoglik")
+                   tuneMethod = "cvLoglik")#estimation used 20 lambda values
 colMeans(summary(fit_cv))
   })
 
@@ -157,7 +156,7 @@ jobfair_test_ad_ctmf <- model.matrix(~., jobfair_test_ad_dc %>% select(!registra
 
 # group-scaling -----------------------------------------------------------
 # group-scaling in order to (try to) eliminate hierarchical structure of the data. Alternative is to use hierarchical
-# modelling approach, but it would be impossible to meet the deadline if I go there and not sure if it helps much compared to this approach
+# modelling approach, but not sure if it helps much compared to this approach
 
 #numeric variables
 namesNum <- jobfair_test %>% select(where(is.numeric)) %>% names()
